@@ -8,14 +8,14 @@ defined('C5_EXECUTE') or die("Access Denied.");
 
 class TreeJsonFormatter extends AbstractTreeJsonFormatter
 {
-    public function jsonSerialize()
+    public function jsonSerialize():mixed
     {
         $response = array();
         /**
          * @var $entry Entry
          */
         foreach ($this->collection->getRecords() as $entry) {
-            $messages = $this->validator->validate($entry);
+            $messages = $this->getValidationMessages($entry);
             $formatter = $messages->getFormatter();
 
             $node = new \stdClass();

@@ -77,7 +77,7 @@ class Message implements \JsonSerializable, \Serializable
         return (string) $this->text;
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize():mixed
     {
         $formatter = new MessageJsonFormatter($this);
 

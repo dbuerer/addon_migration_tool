@@ -1,6 +1,7 @@
 <?php
 namespace PortlandLabs\Concrete5\MigrationTool\Batch\Formatter\User;
 
+use PortlandLabs\Concrete5\MigrationTool\Batch\Validator\BatchObjectValidatorSubject;
 use PortlandLabs\Concrete5\MigrationTool\Entity\Import\User;
 
 defined('C5_EXECUTE') or die("Access Denied.");
@@ -14,7 +15,7 @@ class TreeUserJsonFormatter implements \JsonSerializable
         $this->user = $user;
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize():mixed
     {
         $nodes = array();
         $user = $this->user;
@@ -23,7 +24,10 @@ class TreeUserJsonFormatter implements \JsonSerializable
 
         $batch = $r->findFromCollection($collection);
         $validator = $collection->getRecordValidator($batch);
-        $messages = $validator->validate($user);
+        $subject = new BatchObjectValidatorSubject($batch, $user);
+        $result = $validator->validate($subject);
+        $messages = $result->getMessages();
+
         if ($messages->count()) {
             $messageHolderNode = new \stdClass();
             $messageHolderNode->icon = $messages->getFormatter()->getCollectionStatusIconClass();

@@ -2,41 +2,39 @@
 namespace PortlandLabs\Concrete5\MigrationTool\Batch\Formatter\Page;
 
 use PortlandLabs\Concrete5\MigrationTool\Batch\Formatter\StyleSet\TreeJsonFormatter as StyleSetTreeJsonFormatter;
+use PortlandLabs\Concrete5\MigrationTool\Batch\Validator\BatchObjectValidatorSubject;
+use PortlandLabs\Concrete5\MigrationTool\Entity\Import\Batch;
 use PortlandLabs\Concrete5\MigrationTool\Entity\Import\Page;
 
 defined('C5_EXECUTE') or die("Access Denied.");
 
 class TreePageJsonFormatter implements \JsonSerializable
 {
+    /**
+     * @var \PortlandLabs\Concrete5\MigrationTool\Entity\Import\Page
+     */
     protected $page;
 
-    public function __construct(Page $page)
+    /**
+     * @var \PortlandLabs\Concrete5\MigrationTool\Entity\Import\Batch
+     */
+    protected $batch;
+
+    public function __construct(Batch $batch, Page $page)
     {
         $this->page = $page;
+        $this->batch = $batch;
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize():mixed
     {
-        $nodes = array();
-        $page = $this->page;
-        $collection = $page->getCollection();
-        $r = \Package::getByHandle('migration_tool')->getEntityManager()->getRepository('\PortlandLabs\Concrete5\MigrationTool\Entity\Import\Batch');
+        $collection = $this->page->getCollection();
+        $nodes = $this->getPageDetailNodes();
 
-        $descriptionNode = new \stdClass();
-        $descriptionNode->icon = 'fa fa-quote-left';
-        $descriptionNode->title = t('Description');
-        $descriptionNode->itemvalue = $this->page->getDescription();
-        $nodes[] = $descriptionNode;
-
-        $dateNode = new \stdClass();
-        $dateNode->icon = 'fa fa-calendar';
-        $dateNode->title = t('Date');
-        $dateNode->itemvalue = $this->page->getPublicDate();
-        $nodes[] = $dateNode;
-
-        $batch = $r->findFromCollection($collection);
-        $validator = $collection->getRecordValidator($batch);
-        $messages = $validator->validate($page);
+        $validator = $collection->getRecordValidator($this->batch);
+        $subject = new BatchObjectValidatorSubject($this->batch, $this->page);
+        $result = $validator->validate($subject);
+        $messages = $result->getMessages();
         if ($messages->count()) {
             $messageHolderNode = new \stdClass();
             $messageHolderNode->icon = $messages->getFormatter()->getCollectionStatusIconClass();
@@ -50,12 +48,12 @@ class TreePageJsonFormatter implements \JsonSerializable
             }
             $nodes[] = $messageHolderNode;
         }
-        if ($page->getAttributes()->count()) {
+        if ($this->page->getAttributes()->count()) {
             $attributeHolderNode = new \stdClass();
             $attributeHolderNode->icon = 'fa fa-cogs';
             $attributeHolderNode->title = t('Attributes');
             $attributeHolderNode->children = array();
-            foreach ($page->getAttributes() as $attribute) {
+            foreach ($this->page->getAttributes() as $attribute) {
                 $value = $attribute->getAttribute()->getAttributeValue();
                 if (is_object($value)) {
                     $attributeFormatter = $value->getFormatter();
@@ -65,12 +63,12 @@ class TreePageJsonFormatter implements \JsonSerializable
             }
             $nodes[] = $attributeHolderNode;
         }
-        if ($page->getAreas()->count()) {
+        if ($this->page->getAreas()->count()) {
             $areaHolderNode = new \stdClass();
             $areaHolderNode->icon = 'fa fa-code';
             $areaHolderNode->title = t('Areas');
             $areaHolderNode->children = array();
-            foreach ($page->getAreas() as $area) {
+            foreach ($this->page->getAreas() as $area) {
                 $areaNode = new \stdClass();
                 $areaNode->icon = 'fa fa-cubes';
                 $areaNode->title = $area->getName();
@@ -96,6 +94,57 @@ class TreePageJsonFormatter implements \JsonSerializable
             $nodes[] = $areaHolderNode;
         }
 
+        return $nodes;
+    }
+
+    private function getPageDetailNodes(): array
+    {
+        $nodes = [];
+        switch ($this->page->getKind()) {
+            case Page::KIND_ALIAS:
+                $nodes[] = [
+                    'icon' => 'far fa-dot-circle',
+                    'title' => t('Alias Of'),
+                    'itemvalue' => h($this->page->getTarget()),
+                ];
+                break;
+            case Page::KIND_EXTERNAL_LINK:
+                $nodes[] = [
+                    'icon' => 'far fa-dot-circle',
+                    'title' => t('URL'),
+                    'itemvalue' => h($this->page->getTarget()) . ($this->page->isNewWindow() ? (' (' . t('new window') . ')' ) : ''),
+                ];
+                break;
+        }
+        foreach ($this->page->getAdditionalPaths() as $additionalPath) {
+            $nodes[] = [
+                'icon' => 'fas fa-link',
+                'title' => t('Additional Path'),
+                'itemvalue' => h('/' . $additionalPath->getPath()),
+            ];
+        }
+        foreach ($this->page->getHRefLangs() as $hrefLang) {
+            $nodes[] = [
+                'icon' => 'fas fa-random',
+                'title' => h(t('Map for %s', $hrefLang->getLocaleID())),
+                'itemvalue' => h($hrefLang->getPathForLocale()),
+            ];
+        }
+        if ($this->page->getDescription() !== '') {
+            $nodes[] = [
+                'icon' => 'fa fa-quote-left',
+                'title' => t('Description'),
+                'itemvalue' => h($this->page->getDescription()),
+            ];
+        }
+        if ($this->page->getPublicDate()) {
+            $nodes[] = [
+                'icon' => 'fa fa-calendar',
+                'title' => t('Date'),
+                'itemvalue' => h($this->page->getPublicDate()),
+            ];
+        }
+        
         return $nodes;
     }
 }
